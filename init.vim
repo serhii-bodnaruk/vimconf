@@ -5,6 +5,8 @@ if has("autocmd")
   au BufRead,BufNewFile *.erb set filetype=eruby.html
 endif
 
+set t_ut=                " fix 256 colors in tmux http://sunaku.github.io/vim-256color-bce.html
+
 au BufWritePre * :%s/\s\+$//e       " trailing whitespaces
 
 set shell=/bin/bash
@@ -15,11 +17,22 @@ set rnu
 set fillchars=vert:\                " disable vert div chars
 set nocompatible                    " be iMproved, required
 set cursorline                      " highlight the cursor screen line "
-set cursorcolumn                      " highlight the cursor screen line "
-set scrolloff=5                     " minimal number of screen lines to keep above and below the cursor "
+set cursorcolumn                    " highlight the cursor screen line "
+set scrolloff=10                    " minimal number of screen lines to keep above and below the cursor "
 set spell spelllang=en_us           " spellchecker
-set nolazyredraw                      " lazyredraw
+set lazyredraw                      " lazyredraw
 
+" define a path to store persistent undo files.
+let target_path = expand('~/.vim/persisted-undo/')
+" create the directory and any parent directories
+" if the location does not exist.
+if !isdirectory(target_path)
+  call system('mkdir -p ' . target_path)
+endif
+" point Vim to the defined undo directory.
+let &undodir = target_path
+" finally, enable undo persistence.
+set undofile
 
 " Auto indentation
 set expandtab
@@ -27,20 +40,21 @@ set shiftwidth=2
 set softtabstop=2
 
 let g:ruby_indent_access_modifier_style="indent"
+let g:ruby_indent_assignment_style="variable"
 
 " String to put at the start of lines that have been wrapped "
-let &showbreak='↪ '
+let &showbreak='? '
 
-" remap colon
-map ; :
 
 " jump to end of text you pasted
 vnoremap <silent> y y`]
 vnoremap <silent> p p`]
 nnoremap <silent> p p`]
 
-" remap esc
-imap jj <Esc>
+" " remap esc
+" imap jj <Esc>
+" remap colon
+map ; :
 
 " leader
 let mapleader=","
@@ -48,11 +62,9 @@ let mapleader=","
 "---------------- Plugins -------------------
 call plug#begin('~/.vim/plugged')
   Plug 'vim-scripts/L9'
-  Plug 'rstacruz/sparkup', {'rtp': 'vim/'}
-  Plug 'gmarik/Vundle.vim'
 
   " Navigation
-  Plug 'bkad/CamelCaseMotion'
+  Plug 'chaoren/vim-wordmotion'
   Plug 'Lokaltog/vim-easymotion'
   Plug 'scrooloose/nerdtree'
   Plug 'ctrlpvim/ctrlp.vim'
@@ -60,13 +72,28 @@ call plug#begin('~/.vim/plugged')
   Plug 'majutsushi/tagbar'
   Plug 'matze/vim-move'
 
+  " config
+  Plug 'editorconfig/editorconfig-vim'
+
   " Correction
   Plug 'w0rp/ale'
-  Plug 'Valloric/YouCompleteMe', { 'do': './install.py' }
-  Plug 'junegunn/vim-easy-align'
   Plug 'ntpeters/vim-better-whitespace'
-  Plug 'Raimondi/delimitMate'
   Plug 'reedes/vim-wordy'
+  Plug 'autozimu/LanguageClient-neovim', {
+        \ 'branch': 'next',
+        \ 'do': 'bash install.sh',
+        \ }
+  Plug 'junegunn/fzf'
+  " Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
+  " " if has('win32') || has('win64')
+  " "   Plug 'tbodt/deoplete-tabnine', { 'do': 'powershell.exe .\install.ps1' }
+  " " else
+  " "   Plug 'tbodt/deoplete-tabnine', { 'do': './install.sh' }
+  " " endif
+  Plug 'jphustman/sqlutilities'
+  Plug 'github/copilot.vim'
+  Plug 'jbyuki/venn.nvim'
+  Plug 'anuvyklack/hydra.nvim'
 
   " Appearance
   Plug 'tomasr/molokai'
@@ -82,12 +109,12 @@ call plug#begin('~/.vim/plugged')
   " Objects
   Plug 'kana/vim-textobj-user'
   Plug 'glts/vim-textobj-comment'
+  Plug 'noprompt/vim-yardoc'
 
   " General editing
   Plug 'tpope/vim-surround'
   Plug 'tpope/vim-repeat'
   Plug 'tomtom/tcomment_vim'
-  Plug 'mattn/emmet-vim'
   Plug 'mattn/webapi-vim'
   Plug 'mattn/gist-vim'
 
@@ -99,7 +126,14 @@ call plug#begin('~/.vim/plugged')
   Plug 'janko-m/vim-test'
   Plug 'benmills/vimux'
   Plug 'danchoi/ruby_bashrockets.vim'
+  Plug 'noprompt/vim-yardoc'
   Plug 'victorfeijo/binding-pry-vim'
+
+  " go
+  Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
+
+  " helm
+  Plug 'towolf/vim-helm'
 
   " Languages
   Plug 'slim-template/vim-slim'
@@ -111,9 +145,24 @@ call plug#begin('~/.vim/plugged')
   Plug 'pangloss/vim-javascript'
   Plug 'mxw/vim-jsx'
   Plug 'plasticboy/vim-markdown'
-  Plug 'aliva/vim-fish'
+
+  " Notifications
+  Plug 'rcarriga/nvim-notify'
 call plug#end()
 "-------------- Plugins Settings--------------
+
+" Required for operations modifying multiple buffers like rename.
+set hidden
+
+let g:LanguageClient_serverCommands = {
+    \ 'ruby': ['~/.rbenv/shims/solargraph', 'stdio'],
+    \ }
+
+" " Deoplate
+" let g:deoplete#enable_at_startup = 1
+" " call deoplete#custom#option('sources', {
+" " \ '_': ['tabnine', 'buffer'],
+" " \})
 
 " easy align
 " Start interactive EasyAlign in visual mode (e.g. vip<Enter>)
@@ -139,6 +188,7 @@ let g:airline_right_alt_sep = ''
 
 " nerd tree
 map <C-n> :NERDTreeToggle<CR>
+map ff :NERDTreeFind<CR>
 
 " molokai & colors/italic/background
 set t_Co=256
@@ -147,14 +197,6 @@ let g:rehash256 = 1
 colo molokai
 hi Normal ctermfg=252 ctermbg=none
 hi Comment cterm=italic
-
-" camel case
-map <silent> w <Plug>CamelCaseMotion_w
-map <silent> b <Plug>CamelCaseMotion_b
-map <silent> e <Plug>CamelCaseMotion_e
-sunmap w
-sunmap b
-sunmap e
 
 " rspec
 let test#strategy = {
@@ -166,6 +208,7 @@ let test#strategy = {
 map <Leader>t :TestFile<CR>
 map <Leader>s :TestNearest<CR>
 
+
 " ctrl P
 map <Leader>c :CtrlP<CR>
 map <Leader>na :CtrlP app/<CR>
@@ -176,25 +219,22 @@ map <Leader>ns :CtrlP spec/<CR>
 
 map gp :bp<CR>
 map gn :bn<CR>
+
 " ag
 if executable('ag')
   let ignore_options = '
     \ --ignore-dir "bin"
     \ --ignore-dir "coverage"
+    \ --ignore-dir "rspec"
     \ --ignore-dir "data"
-    \ --ignore-dir "design"
     \ --ignore-dir "doc"
     \ --ignore-dir "log"
-    \ --ignore-dir "public"
-    \ --ignore-dir "spec_old"
-    \ --ignore-dir "studios"
-    \ --ignore-dir "template"
     \ --ignore-dir "tmp"
     \ --ignore-dir "vendor"
     \ --ignore-dir "middleware"
     \ --ignore-dir "verificator"
     \ --ignore-dir "node_modules"
-    \ --ignore "*.log"
+    \ --ignore-dir "engines"
     \ --ignore "*tags"
     \ --ignore "Gemfile.lock"
     \ --ignore "Guarfile"
@@ -202,7 +242,6 @@ if executable('ag')
     \ --ignore "REVISION"
     \ --ignore "Yarn.lock"
     \ --ignore "config.ru"
-    \ --ignore "db/schema*"
     \ --ignore "options.reek"
     \ --ignore "overhaul-backend.sql"
     \ --ignore "overhaul-backend.sql.zip"
@@ -217,14 +256,11 @@ if executable('ag')
 
   " AG
   map <Leader>g :Ag<SPACE>
-  let g:ag_prg='ag -S --nocolor --nogroup --column ' . ignore_options
+  let g:ag_prg='rg -S --column --sort path -g "!app/assets"'
 endif
 
 " rails
 map <Leader>.h :AV<CR>
-
-" youcompleteme
-let g:EclimCompletionMethod = 'omnifunc'
 
 " ctags
 map <Leader>.z :CtrlPTag<CR>
@@ -235,9 +271,9 @@ map <Leader>.t :ta /^
 let g:move_key_modifier = 'C'
 
 " fugitive
-map <Leader>.s :Gstatus<CR>
-map <Leader>.b :Gblame<CR>
-map <Leader>.w :Gbrowse<CR>
+map <Leader>.s :Git status<CR>
+map <Leader>.b :Git blame<CR>
+map <Leader>.w :GBrowse<CR>
 map <Leader>.d :Gdiff<CR>
 set diffopt+=vertical
 
@@ -245,21 +281,26 @@ set diffopt+=vertical
 nmap =j :%!python -m json.tool<CR>
 
 " ale
-" \   'ruby': ['ruby', 'brakeman', 'reek', 'fasterer', 'rails_best_practices', 'rubycop'],
-let g:ale_linters = {
-\   'ruby': ['ruby', 'brakeman', 'fasterer'],
-\   'javascript': ['eslint'],
+" Only run linters named in ale_linters settings.
+let g:ale_linters_explicit = 1
+let b:ale_linters = {
+\   'ruby': ['ruby', 'rubycop', 'reek']
 \}
 
 let g:airline#extensions#ale#enabled = 1
 
-let g:ale_completion_enabled = 1
+let g:ale_lint_on_text_changed = 1
+let g:ale_completion_enabled = 0
 let g:ale_sign_column_always = 1
-let g:ale_echo_msg_error_str = 'Er'
-let g:ale_echo_msg_warning_str = '♿'
-let g:ale_sign_error = 'Er'
-let g:ale_sign_warning = '♿'
+let g:ale_echo_msg_error_str = '? '
+let g:ale_echo_msg_warning_str = '?'
+let g:ale_sign_error = '? '
+let g:ale_sign_warning = '?'
 let g:ale_echo_msg_format = '[%linter%] %s'
+
+nnoremap <silent> K :call LanguageClient#textDocument_hover()<CR>
+nnoremap <silent> gd :call LanguageClient#textDocument_definition()<CR>
+nnoremap <silent> gr :call LanguageClient#textDocument_rename()<CR>
 "---------------------- End -----------------------------
 
 highlight clear SpellBad
@@ -283,6 +324,10 @@ let g:wordy#ring = [
 
 
 " autocorrect
+ia managemnet management
+ia Managemnet Management
+ia Locatinos Locations
+ia locatinos locations
 ia shipmnet shipment
 ia Shipmnet Shipment
 ia recepients recipients
@@ -294,3 +339,52 @@ inoremap - <C-]>-
 
 " jsx
 let g:jsx_pragma_required = 1
+
+
+" vim rails
+
+map <Leader>ra :A<CR>
+
+let g:rails_projections = {
+      \  "app/notification_management/models/*.rb": {
+      \      "test": [
+      \        "spec/models/{}_spec.rb"
+      \      ]
+      \   },
+      \  "app/controllers/*_controller.rb": {
+      \      "test": [
+      \        "spec/requests/{}_request_spec.rb",
+      \        "spec/controllers/{}_controller_spec.rb",
+      \        "test/controllers/{}_controller_test.rb"
+      \      ],
+      \      "alternate": [
+      \        "spec/requests/{}_request_spec.rb",
+      \        "spec/controllers/{}_controller_spec.rb",
+      \        "test/controllers/{}_controller_test.rb"
+      \      ],
+      \   },
+      \   "spec/requests/*_request_spec.rb": {
+      \      "command": "request",
+      \      "alternate": "app/controllers/{}_controller.rb",
+      \      "template": "require 'rails_helper'\n\n" .
+      \        "RSpec.describe '{}' do\nend",
+      \   },
+      \ }
+
+
+" Copilot
+" imap <silent><script><expr> <C-J> copilot#Accept("\<CR>")
+" let g:copilot_no_tab_map = v:true
+
+" fugitive
+nnoremap <leader>pd :Gdiffsplit!<CR>
+nnoremap <leader>ps :Gstatus<CR>
+nnoremap <leader>ph :diffget //2<CR>
+nnoremap <leader>pl :diffget //3<CR>
+nnoremap <Leader>pb :Gblame<CR>
+nnoremap <Leader>pw :Gbrowse<CR>
+set diffopt+=vertical
+
+" motion
+nnoremap <C-d> db
+source ~/.config/nvim/lua/config.lua
